@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multi-Account WhatsApp Web Hub</title>
+  <style>
+    :root {
+      --bg-color: #0b141a;
+      --card-bg: #111b21;
+      --accent-color: #00a884;
+      --text-color: #e9edef;
+      --muted-text: #8696a0;
+      --input-bg: #202c33;
+    }
+
+    body.theme-amoled {
+      --bg-color: #000000;
+      --card-bg: #121212;
+      --input-bg: #1e1e1e;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 900px;
+      background-color: var(--card-bg);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+
+    @media (min-width: 768px) {
+      .container { grid-template-columns: 1fr 1fr; }
+      .full-width { grid-column: span 2; }
+    }
+
+    h2, h3 { color: var(--accent-color); margin-bottom: 10px; }
+
+    .card {
+      background-color: rgba(255, 255, 255, 0.03);
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    label { display: block; font-size: 0.85rem; color: var(--muted-text); margin-bottom: 6px; }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      background-color: var(--input-bg);
+      border: 1px solid transparent;
+      border-radius: 8px;
+      color: var(--text-color);
+      margin-bottom: 12px;
+      outline: none;
+    }
+
+    input:focus, select:focus, textarea:focus { border-color: var(--accent-color); }
+
+    .btn {
+      width: 100%;
+      padding: 10px;
+      background-color: var(--accent-color);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .btn-secondary {
+      background-color: #374151;
+      margin-top: 6px;
+    }
+
+    .flex-row { display: flex; gap: 10px; }
+
+    .contact-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px;
+      background-color: var(--input-bg);
+      border-radius: 6px;
+      margin-bottom: 6px;
+    }
+
+    .contact-item button {
+      background: none;
+      border: none;
+      color: var(--accent-color);
+      cursor: pointer;
+      margin-left: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Account & Theme Switcher Header -->
+    <div class="full-width card">
+      <h2>WhatsApp Multi-Account Hub</h2>
+      <div class="flex-row">
+        <div style="flex: 1;">
+          <label for="accountSelect">Active Account Profile</label>
+          <select id="accountSelect" onchange="switchAccount(this.value)">
+            <!-- Dynamic Account Options -->
+          </select>
+        </div>
+        <div style="flex: 1;">
+          <label for="themeSelect">Theme</label>
+          <select id="themeSelect" onchange="changeTheme(this.value)">
+            <option value="default">WhatsApp Dark</option>
+            <option value="theme-amoled">AMOLED Pitch Black</option>
+          </select>
+        </div>
+      </div>
+      
+      <!-- Account Manager Controls -->
+      <div class="flex-row">
+        <input type="text" id="newAccountName" placeholder="New Profile Name (e.g. Business)" style="margin-bottom:0;" />
+        <button class="btn" style="width: auto; whitespace: nowrap;" onclick="addAccount()">Add Profile</button>
+      </div>
+    </div>
+
+    <!-- Direct Messaging Tool -->
+    <div class="card">
+      <h3>Quick Direct Message</h3>
+      <label for="phone">Phone Number (with Country Code)</label>
+      <input type="number" id="phone" placeholder="e.g. 919876543210" />
+
+      <label for="message">Message</label>
+      <textarea id="message" rows="3" placeholder="Type message..."></textarea>
+
+      <button class="btn" onclick="openChat()">Send Message</button>
+    </div>
+
+    <!-- Account-Specific Quick Contacts -->
+    <div class="card">
+      <h3>Saved Contacts (<span id="profileBadge">Personal</span>)</h3>
+      <input type="text" id="cName" placeholder="Name" />
+      <input type="number" id="cNum" placeholder="Phone Number" />
+      <button class="btn" onclick="saveContact()">Save to Profile</button>
+
+      <div id="contactList" style="margin-top: 12px; max-height: 150px; overflow-y: auto;"></div>
+    </div>
+
+    <!-- Launch External Web Sessions -->
+    <div class="full-width card">
+      <h3>Launch Web Sessions</h3>
+      <p style="color: var(--muted-text); font-size: 0.85rem; margin-bottom: 10px;">
+        To keep 2 accounts open on desktop simultaneously, launch one in a standard tab and the second in an <strong>Incognito Window</strong> or <strong>Second Browser Profile</strong>.
+      </p>
+      <div class="flex-row">
+        <button class="btn" onclick="openWeb('https://web.whatsapp.com')">Open Primary Web</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Storage Structure
+    let store = JSON.parse(localStorage.getItem('waHubData')) || {
+      activeProfile: 'Personal',
+      profiles: {
+        'Personal': { contacts: [] },
+        'Work': { contacts: [] }
+      }
+    };
+
+    function saveStore() {
+      localStorage.setItem('waHubData', JSON.stringify(store));
+    }
+
+    function init() {
+      renderAccountDropdown();
+      loadActiveProfile();
+    }
+
+    function renderAccountDropdown() {
+      const select = document.getElementById('accountSelect');
+      select.innerHTML = '';
+      Object.keys(store.profiles).forEach(prof => {
+        const opt = document.createElement('option');
+        opt.value = prof;
+        opt.textContent = prof;
+        if (prof === store.activeProfile) opt.selected = true;
+        select.appendChild(opt);
+      });
+    }
+
+    function switchAccount(profileName) {
+      store.activeProfile = profileName;
+      saveStore();
+      loadActiveProfile();
+    }
+
+    function addAccount() {
+      const input = document.getElementById('newAccountName');
+      const name = input.value.trim();
+      if (!name) return alert('Enter a profile name');
+      if (store.profiles[name]) return alert('Profile exists');
+
+      store.profiles[name] = { contacts: [] };
+      store.activeProfile = name;
+      saveStore();
+      input.value = '';
+      renderAccountDropdown();
+      loadActiveProfile();
+    }
+
+    function loadActiveProfile() {
+      document.getElementById('profileBadge').textContent = store.activeProfile;
+      renderContacts();
+    }
+
+    function saveContact() {
+      const name = document.getElementById('cName').value.trim();
+      const num = document.getElementById('cNum').value.trim();
+      if (!name || !num) return alert('Enter name and phone');
+
+      store.profiles[store.activeProfile].contacts.push({ name, num });
+      saveStore();
+      document.getElementById('cName').value = '';
+      document.getElementById('cNum').value = '';
+      renderContacts();
+    }
+
+    function deleteContact(idx) {
+      store.profiles[store.activeProfile].contacts.splice(idx, 1);
+      saveStore();
+      renderContacts();
+    }
+
+    function renderContacts() {
+      const list = document.getElementById('contactList');
+      list.innerHTML = '';
+      const contacts = store.profiles[store.activeProfile].contacts;
+
+      contacts.forEach((c, i) => {
+        const item = document.createElement('div');
+        item.className = 'contact-item';
+        item.innerHTML = `
+          <span><strong>${c.name}</strong> (${c.num})</span>
+          <div>
+            <button onclick="window.open('https://wa.me/${c.num}', '_blank')">Chat</button>
+            <button onclick="deleteContact(${i})" style="color:#ff5555;">Del</button>
+          </div>
+        `;
+        list.appendChild(item);
+      });
+    }
+
+    function openChat() {
+      const phone = document.getElementById('phone').value.trim();
+      const msg = encodeURIComponent(document.getElementById('message').value.trim());
+      if (!phone) return alert('Enter a phone number');
+      window.open(`https://wa.me/${phone}${msg ? '?text=' + msg : ''}`, '_blank');
+    }
+
+    function openWeb(url) {
+      window.open(url, '_blank');
+    }
+
+    function changeTheme(theme) {
+      document.body.className = theme === 'default' ? '' : theme;
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>
